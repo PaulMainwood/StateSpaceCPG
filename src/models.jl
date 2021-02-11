@@ -161,7 +161,7 @@ function regression(y::VecOrMat{Typ}, X::VecOrMat{Typ}) where Typ <: Real
         Z[:, :, t] = X[t, :]
     end
     T = Matrix{Typ}(I, p_X, p_X)
-    R = Matrix{Typ}(I, m, m)
+    R = zeros(Typ, p_X, 1)
     Q = zeros(Typ, 1, 1)
     d = zeros(Typ, n_y, p_y)
     c = zeros(Typ, n_X, p_X)
@@ -171,7 +171,16 @@ function regression(y::VecOrMat{Typ}, X::VecOrMat{Typ}) where Typ <: Real
     return StateSpaceModel(y, Z, T, R, d, c, H, Q)
 end
 
-function tvm(y::VecOrMat{Typ}, X::VecOrMat{Typ}) where Typ <: Real
+"""
+    tvm(y::VecOrMat{Typ}, X::VecOrMat{Typ}) where Typ <: Real
+
+Build state-space system for estimating a time varying regression model ``y_t = X_t\\beta_t + \\varepsilon_t``. Once the model is estimated
+the user can recover the parameter ``\\hat{\\beta}`` by the querying the smoothed states of the model.
+"""
+
+function tvm(y::VecOrMat{Typ}, X::VecOrMat{Typ}; X_var = zeros(Typ, size(X, 2))) where Typ <: Real
+
+    #Time varying
     # Certify that they are matrices
     y = ensure_is_matrix(y)
     X = ensure_is_matrix(X)
@@ -190,14 +199,18 @@ function tvm(y::VecOrMat{Typ}, X::VecOrMat{Typ}) where Typ <: Real
     # Fill Z
     Z = Array{Typ, 3}(undef, p_y, m, n_X)
     for t in 1:n_X
-        Z[:, :, t] = hcat(Matrix{Typ}(I, p_y, p_y), X[t, :])
+        Z[:, :, t] = vcat(Matrix{Typ}(I, p_y, p_y), X[t, :])
     end
     T = Matrix{Typ}(I, m, m)
-    R = Matrix{Typ}(I, m, m)
+    R = diagm(vcat([1.0], X_var))
+    
+    Q = diagm(vcat([1.0], X_var))
+    Q[findall(isequal(1.0), Q)] .= NaN
 
-    #println(Z)
-    #println(T)
-    #println(R)
+    d = zeros(Typ, n_y, p_y)
+    c = zeros(Typ, n_X, m)
 
-    return StateSpaceModel(y, Z, T, R)
+    H = build_H(p_y, Typ)
+
+    return StateSpaceModel(y, Z, T, R, d, c, H, Q)
 end

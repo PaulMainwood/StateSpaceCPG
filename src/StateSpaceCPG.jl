@@ -1,4 +1,4 @@
-module StateSpaceModels
+module StateSpaceCPG
 
 using Optim, Distributions, LinearAlgebra, StaticArrays, Dates, Printf, StatsBase
 
